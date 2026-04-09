@@ -1,7 +1,9 @@
 package com.demo.restapi.config;
+import jakarta.servlet.Filter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
+import org.springframework.web.filter.ShallowEtagHeaderFilter;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.config.annotation.ContentNegotiationConfigurer;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -12,6 +14,13 @@ import java.util.Locale;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
+
+    @Bean
+    public ShallowEtagHeaderFilter shallowEtagHeaderFilter() {
+        ShallowEtagHeaderFilter filter = new ShallowEtagHeaderFilter();
+        filter.setWriteWeakETag(true);
+        return filter;
+    }
 
     /**
      * 1.h: CORS Configuration

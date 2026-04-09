@@ -23,7 +23,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/v1/products") // 1.f Versioning technique 1: URI
+@RequestMapping(
+        value = "/api/v1/products",
+        produces = { "application/json", "application/xml" }
+)
 @RequiredArgsConstructor
 public class ProductController {
 
@@ -35,9 +38,9 @@ public class ProductController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Double minPrice,
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 5, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        // 1. Get a Page object from the service (contains only 10 items, not the whole DB)
+        // 1. Get a Page object from the service (contains only 5 items, not the whole DB)
         Page<ProductPreviewDTO> pageResult = productService.searchProducts(q, category, minPrice, pageable);
 
         // 2. Convert each DTO into an EntityModel with a "self" link
@@ -73,12 +76,9 @@ public class ProductController {
                         .getSellerById(product.getSeller().getId())).withRel("seller")
         );
 
-        // 3. Return with Cache headers and ETag (Performance Requirement)
         return ResponseEntity.ok()
-                // Cache for 1 hour
                 .cacheControl(CacheControl.maxAge(60, TimeUnit.MINUTES).cachePublic())
-                // ETag helps with "Conditional GETs" (saves bandwidth)
-                .eTag(String.valueOf(product.hashCode()))
+                // Retirez .eTag(...) ici
                 .body(resource);
     }
 
