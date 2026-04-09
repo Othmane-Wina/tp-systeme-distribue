@@ -14,8 +14,10 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -48,48 +50,85 @@ public class GlobalExceptionHandler {
     // 2. BODY_NOT_VALID (400)
     // Triggered when @Valid fails on a @RequestBody
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleBodyInvalid(MethodArgumentNotValidException ex) {
-        ErrorResponse error = new ErrorResponse(
-                "BODY_NOT_VALID",
-                "The JSON body is missing required fields or has invalid formats.",
-                LocalDateTime.now()
-        );
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<Map<String, Object>> handleBodyInvalid(MethodArgumentNotValidException ex, Locale locale) {
+        // 1. Extract the specific field errors to help with debugging
+        List<String> details = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.toList());
+
+        // 2. Try to get the translated general message
+        String errorMessage;
+        try {
+            errorMessage = messageSource.getMessage("validation.error", null, locale);
+        } catch (NoSuchMessageException e) {
+            errorMessage = "Invalid request content.";
+        }
+
+        // 3. Build the body map exactly like handleNotFound
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("errorCode", "BODY_NOT_VALID");
+        body.put("message", errorMessage);
+        body.put("details", details); // This shows WHICH fields failed
+        body.put("path", "/api/v1/products");
+
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     // 3. PARAMS_NOT_VALID (400)
     // Triggered for invalid URL parameters or Type mismatches
     @ExceptionHandler({MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
-    public ResponseEntity<ErrorResponse> handleParamsInvalid(Exception ex) {
-        ErrorResponse error = new ErrorResponse(
-                "PARAMS_NOT_VALID",
-                "The URL parameters provided are invalid or missing.",
-                LocalDateTime.now()
-        );
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<Map<String, Object>> handleParamsInvalid(Exception ex, Locale locale) {
+        String errorMessage = messageSource.getMessage("params.invalid", null, locale);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", "Bad Request");
+        body.put("errorCode", "PARAMS_NOT_VALID");
+        body.put("message", errorMessage);
+        body.put("path", "/api/v1/products");
+
+        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
     }
 
     // 4. PATH_NOT_FOUND (404)
     // Triggered when a user hits a URL that doesn't exist
     @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseEntity<ErrorResponse> handlePathNotFound(NoHandlerFoundException ex) {
-        ErrorResponse error = new ErrorResponse(
-                "PATH_NOT_FOUND",
-                "The requested URL path does not exist.",
-                LocalDateTime.now()
-        );
-        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    public ResponseEntity<Map<String, Object>> handlePathNotFound(NoHandlerFoundException ex, Locale locale) {
+        String errorMessage = messageSource.getMessage("path.notfound", null, locale);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.NOT_FOUND.value());
+        body.put("error", "Not Found");
+        body.put("errorCode", "PATH_NOT_FOUND");
+        body.put("message", errorMessage);
+        body.put("path", ex.getRequestURL());
+
+        return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
     }
 
     // 5. SERVER_ERROR (500)
     // The "Catch-All" for any unexpected crashes
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneralError(Exception ex) {
-        ErrorResponse error = new ErrorResponse(
-                "SERVER_ERROR",
-                "Something went wrong on our end. Please try again later.",
-                LocalDateTime.now()
-        );
-        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    public ResponseEntity<Map<String, Object>> handleGeneralError(Exception ex, Locale locale) {
+        String errorMessage = messageSource.getMessage("server.error", null, locale);
+
+        // Good practice: Log the actual exception so you can see it in the console
+        ex.printStackTrace();
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        body.put("error", "Internal Server Error");
+        body.put("errorCode", "SERVER_ERROR");
+        body.put("message", errorMessage);
+
+        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
